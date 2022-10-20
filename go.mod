@@ -1,4 +1,4 @@
-module github.com/nyugoh/gokit
+module github.com/nyugoh/jokit
 
 go 1.17
 
