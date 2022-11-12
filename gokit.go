@@ -2,14 +2,13 @@ package jokit
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
 )
 
 const (
-	LogPrefix              = "[gokit]"
+	LogPrefix              = "[jokit]"
 	InternalTimeFormat     = "2006-01-02 15:04:05"
 	InternalTimeFormatMill = "2006-01-02 15:04:05.000"
 )
@@ -47,18 +46,4 @@ func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) error
 		return err
 	}
 	return nil
-}
-
-func GetConfigMandatory(param string) (value string) {
-	if value, present := os.LookupEnv(param); present {
-		return value
-	}
-	panic(fmt.Sprintf("Environment variable `%s' not found.", param))
-}
-
-func GetConfigOptional(param, defaultValue string) (value string) {
-	if value, present := os.LookupEnv(param); present {
-		return value
-	}
-	return defaultValue
 }
