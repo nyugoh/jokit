@@ -6,6 +6,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 )
 
 // DBConfig contains all configs required to connect to the DB, QueryParams are optional, defaultQueryParams are used.
@@ -39,6 +40,41 @@ func DbConnect(dbConfig DBConfig) (*sql.DB, error) {
 
 	Log("%s Connecting to DB...", LogPrefix)
 	db, err := sql.Open(dbConfig.Driver, dbUri)
+	if err != nil {
+		return nil, err
+	}
+
+	Log("%s Testing connection...", LogPrefix)
+	if err = db.Ping(); err != nil {
+		return nil, err
+	}
+	Log("%s Connected to DB successfully...", LogPrefix)
+
+	Log("%s Setting MAX_OPEN_CONNECTIONS...", LogPrefix)
+	db.SetMaxOpenConns(dbConfig.MaxOpenConnections)
+
+	Log("%s Setting MAX_IDLE_CONNECTIONS...", LogPrefix)
+	db.SetMaxIdleConns(dbConfig.MaxIdleConnections)
+
+	Log("%s Setting max open connection lifetime to %d", LogPrefix, dbConfig.MaxOpenConnectionsTTL)
+	db.SetConnMaxLifetime(time.Duration(dbConfig.MaxOpenConnectionsTTL) * time.Second)
+
+	Log("%s Setting max idle connection lifetime to %d", LogPrefix, dbConfig.MaxIdleConnectionsTTL)
+	db.SetConnMaxIdleTime(time.Duration(dbConfig.MaxIdleConnectionsTTL) * time.Second)
+	return db, nil
+}
+
+func DbxConnect(dbConfig DBConfig) (*sqlx.DB, error) {
+	// parse query params
+	queryParams := parseQueryParams(dbConfig.QueryParams)
+	dbUri := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s%s", dbConfig.User, dbConfig.Password, dbConfig.Host, dbConfig.Port, dbConfig.Schema, queryParams)
+
+	if dbConfig.Driver != "mysql" {
+		return nil, fmt.Errorf("%s only mysql driver is configured", LogPrefix)
+	}
+
+	Log("%s Connecting to DB...", LogPrefix)
+	db, err := sqlx.Open(dbConfig.Driver, dbUri)
 	if err != nil {
 		return nil, err
 	}
