@@ -1,23 +1,19 @@
 package jokit
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/spf13/cast"
+
 	rotatelogs "github.com/lestrrat/go-file-rotatelogs"
 	log "github.com/sirupsen/logrus"
 )
 
-var appName string
-
-type LoggerConfig struct {
-	AppEnv    string
-	AppName   string
-	LogFolder string
-	LogLevel  string
-}
+var AppName string
 
 // InitLogger Initializes logger, writes log messages to files
 // * If you want to log locally (e.g in development) set the env value to either (LOCAL | DEV)
@@ -25,19 +21,31 @@ type LoggerConfig struct {
 // * if env is LOCAL, then logs will be output to stdErr
 // * this is got from :: https://gitlab.betika.private/betikateam/gokit/-/blob/fff076dec2d179482352f1e513b22c7fc53a3a38/logger.go#L53
 // * in case of any difference in opinion, feel free to raise and change
-func InitLogger(loggerConfig LoggerConfig) error {
-	appName = loggerConfig.AppName
-	if strings.EqualFold(loggerConfig.AppEnv, "LOCAL") {
+func InitLogger(env, appName, logFolder, logLevel string) error {
+	AppName = appName
+
+	// set output level
+	if len(logLevel) == 0 {
+		logLevel = "info"
+	}
+	l, err := log.ParseLevel(logLevel)
+	if err != nil {
+		fmt.Printf(`%s Bad log level %s: %s\n`, LogPrefix, logLevel, err.Error())
+		return err
+	}
+	log.SetLevel(l)
+
+	if strings.EqualFold(env, "LOCAL") {
 		log.SetOutput(os.Stderr)
 		return nil
 	}
-	if strings.EqualFold(loggerConfig.AppEnv, "DEV") {
+	if strings.EqualFold(env, "DEV") {
 		pwd, err := os.Getwd()
 		if err == nil {
-			loggerConfig.LogFolder = fmt.Sprintf("%s/logs/", pwd)
+			logFolder = fmt.Sprintf("%s/logs/", pwd)
 		}
 	}
-	if strings.EqualFold(loggerConfig.LogFolder, "") {
+	if strings.EqualFold(logFolder, "") {
 		return fmt.Errorf("%s log folder is required", LogPrefix)
 	}
 	if strings.EqualFold(appName, "") {
@@ -45,8 +53,8 @@ func InitLogger(loggerConfig LoggerConfig) error {
 	}
 
 	writer, err := rotatelogs.New(
-		fmt.Sprintf("%s.%s.json", loggerConfig.LogFolder+appName+"-old", "%Y-%m-%d"),
-		rotatelogs.WithLinkName(loggerConfig.LogFolder+appName+".json"),
+		fmt.Sprintf("%s.%s.json", logFolder+appName+"-old", "%Y-%m-%d"),
+		rotatelogs.WithLinkName(logFolder+appName+".json"),
 		rotatelogs.WithRotationTime(time.Hour*24),
 		rotatelogs.WithMaxAge(-1),
 		rotatelogs.WithRotationCount(500),
@@ -62,19 +70,9 @@ func InitLogger(loggerConfig LoggerConfig) error {
 				"app": appName,
 			},
 		})
-	// set output level
-	if len(loggerConfig.LogLevel) == 0 {
-		loggerConfig.LogLevel = "info"
-	}
-	l, err := log.ParseLevel(loggerConfig.LogLevel)
-	if err != nil {
-		fmt.Printf(`%s Bad log level %s: %s\n`, LogPrefix, loggerConfig.LogLevel, err.Error())
-		return err
-	}
-	log.SetLevel(l)
 	log.SetOutput(writer)
 	Log("%s Logger initialized successfully", LogPrefix)
-	Log("%sLog folder:%s Log level:%v App Name:%s", LogPrefix, loggerConfig.LogFolder, l, appName)
+	Log("%sLog folder:%s Log level:%v App Name:%s", LogPrefix, logFolder, l, appName)
 	return nil
 }
 
@@ -84,20 +82,125 @@ func Log(msgFormat string, params ...interface{}) {
 
 func LogInfo(msgFormat string, params ...interface{}) {
 	msg := fmt.Sprintf(msgFormat, params...)
-	log.WithField("app", appName).Info(msg)
+	log.WithField("app", AppName).Info(msg)
+}
+
+type LogField struct {
+	Key   string
+	Value interface{}
+}
+
+// LogInfoWithFields - takes fields and adds them to log message
+// Example:
+//
+//	fields := []gokit.LogField{
+//			 {"req_time", 20},
+//			 {"debit_req_time", "20ms"},
+//			 {"debit_req_status", "200"},
+//		}
+//
+// gokit.LogInfoWithFields(fields, "This is logged with other fields %s", "1")
+// Log message: {"app":"test-app","debit_req_status":"200","debit_req_time":"20ms","level":"info","msg":"This is logged with other fields 1","req_time":20,"time":"2023-03-15 11:03:22.180"}
+func LogInfoWithFields(fields []LogField, msgFormat string, params ...interface{}) {
+	msg := fmt.Sprintf(msgFormat, params...)
+	logFields := log.Fields{}
+	logFields["app"] = AppName
+	for _, f := range fields {
+		logFields[f.Key] = f.Value
+	}
+	log.WithFields(logFields).Info(msg)
+}
+
+func LogWarnWithFields(fields []LogField, msgFormat string, params ...interface{}) {
+	msg := fmt.Sprintf(msgFormat, params...)
+	logFields := log.Fields{}
+	logFields["app"] = AppName
+	for _, f := range fields {
+		logFields[f.Key] = f.Value
+	}
+	log.WithFields(logFields).Warn(msg)
+}
+
+func LogErrorWithFields(fields []LogField, msgFormat string, params ...interface{}) {
+	msg := fmt.Sprintf(msgFormat, params...)
+	logFields := log.Fields{}
+	logFields["app"] = AppName
+	for _, f := range fields {
+		logFields[f.Key] = f.Value
+	}
+	log.WithFields(logFields).Error(msg)
+}
+
+func LogDebugWithFields(fields []LogField, msgFormat string, params ...interface{}) {
+	msg := fmt.Sprintf(msgFormat, params...)
+	logFields := log.Fields{}
+	logFields["app"] = AppName
+	for _, f := range fields {
+		logFields[f.Key] = f.Value
+	}
+	log.WithFields(logFields).Debug(msg)
 }
 
 func LogWarn(msgFormat string, params ...interface{}) {
 	msg := fmt.Sprintf(msgFormat, params...)
-	log.WithField("app", appName).Warn(msg)
+	log.WithField("app", AppName).Warn(msg)
 }
 
 func LogError(msgFormat string, params ...interface{}) {
 	msg := fmt.Sprintf(msgFormat, params...)
-	log.WithField("app", appName).Error(msg)
+	log.WithField("app", AppName).Error(msg)
 }
 
 func LogDebug(msgFormat string, params ...interface{}) {
 	msg := fmt.Sprintf(msgFormat, params...)
-	log.WithField("app", appName).Debug(msg)
+	log.WithField("app", AppName).Debug(msg)
+}
+
+func msgToJson(msg []interface{}) (s string, err error) {
+	switch len(msg) {
+	case 0:
+		s = "\"\""
+	default:
+		var castedArgs []string
+		for _, b := range msg {
+			castedArg, err := cast.ToStringE(b)
+			if err != nil {
+				fmt.Println(err)
+				return "", err
+			}
+			castedArgs = append(castedArgs, castedArg)
+		}
+		s = strings.Join(castedArgs, " ")
+	}
+	return s, nil
+}
+
+func removeBraces(msg string) string {
+	if strings.HasPrefix(msg, "[") && strings.HasSuffix(msg, "]") {
+		msg = msg[1 : len(msg)-1]
+		msg = removeBraces(msg)
+	}
+	if len(msg) <= 1 {
+		return msg
+	}
+	return msg
+}
+
+func LogObject(msg string, o interface{})      { LogObjectInfo(msg, o) }
+func LogObjectInfo(msg string, o interface{})  { writeObject("INFO", msg, o) }
+func LogObjectWarn(msg string, o interface{})  { writeObject("WARN", msg, o) }
+func LogObjectError(msg string, o interface{}) { writeObject("ERROR", msg, o) }
+func LogObjectDebug(msg string, o interface{}) { writeObject("DEBUG", msg, o) }
+
+func writeObject(logLevel, msg string, obj ...interface{}) {
+	objStr, err := json.Marshal(obj)
+	if err != nil {
+		panic(fmt.Sprintf("Cannot marshal object: %s", err))
+	}
+	str := string(objStr)
+	if strings.ToUpper(os.Getenv("APP_ENV")) == "LOCAL" {
+		fmt.Printf("%v\n", str)
+	} else {
+		log.Printf(`{"level":"%s", "time":"%s", "app_name":"%s", "message":%q, "data":%s}`, logLevel, CurrentTimeMill(), os.Getenv("APP_NAME"), msg, str)
+	}
 }

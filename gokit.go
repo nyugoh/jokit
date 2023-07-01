@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	LogRefCtxKey           = "LogRefCtxKey"
+	LogRefCtxKey           = "LogRef"
 	LogPrefix              = "[jokit]"
 	InternalTimeFormat     = "2006-01-02 15:04:05"
 	InternalTimeFormatMill = "2006-01-02 15:04:05.000"

@@ -8,6 +8,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
 	github.com/sirupsen/logrus v1.9.0
+	github.com/spf13/cast v1.5.1
 	github.com/streadway/amqp v1.0.0
 )
 
